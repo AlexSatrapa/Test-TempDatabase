@@ -3,7 +3,7 @@ use warnings FATAL => 'all';
 
 package Test::TempDatabase;
 
-our $VERSION = 0.01;
+our $VERSION = 0.02;
 use DBI;
 use DBD::Pg;
 
