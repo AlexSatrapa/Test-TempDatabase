@@ -1,6 +1,14 @@
 Revision history for Perl module Test::TempDatabase
 
+0.03 Feb 4 2005:
+	- creation, dropping of the database are done through connection handles only
+	- DBD::Pg prerequites are in Makefile.PL
+
+0.02:
+	- tests can pass even if the root user is not PostgreSQL administrator
+	  Fixes CPAN installation woes.
+
 0.01 Thu Sep  2 22:27:56 2004
-	- original version; created by ExtUtils::ModuleMaker 0.32
+	- proof of concept code: database is created and dropped
 
 

@@ -3,7 +3,7 @@ use warnings FATAL => 'all';
 
 package Test::TempDatabase;
 
-our $VERSION = 0.02;
+our $VERSION = 0.03;
 use DBI;
 use DBD::Pg;
 
@@ -15,7 +15,7 @@ Test::TempDatabase - temporary database creation and destruction.
 
   use Test::TempDatabase;
   
-  my $td = Test::TempDatabase->create('temp_db');
+  my $td = Test::TempDatabase->create(dbname => 'temp_db');
   my $dbh = $td->db_handle;
 
   ... some tests ...
@@ -31,9 +31,55 @@ Create test database using Test::TempDatabase->create. Use db_handle
 to get a handle to the database. Database will be automagically dropped
 when Test::TempDatabase instance goes out of scope.
 
+=head2 create
+
+Creates temporary database. It will be dropped when the resulting
+instance will go out of scope.
+
+Arguments are passed in as a keyword-value pairs. Available keywords are:
+
+dbname: the name of the temporary database.
+
+rest: the rest of the database connection string.  It can be used to connect to a different host, etc.
+
+username, password: self-explanatory
+
+=cut
+
+sub connect {
+	my ($self, $db_name) = @_;
+	my $cp = $self->connect_params;
+	return DBI->connect("dbi:Pg:dbname=$db_name;" . ($cp->{rest} || ''),
+				$cp->{username}, $cp->{password},
+			{ RaiseError => 1, AutoCommit => 1 });
+}
+
+sub create {
+	my ($class, %args) = @_;
+	my $self = bless { connect_params => \%args }, $class;
+	my $dbh = $self->connect('template1');
+	$dbh->do("create database " . $args{dbname});
+	$dbh->disconnect;
+	$dbh = $self->connect($args{dbname});
+	$self->{db_handle} = $dbh;
+	return $self;
+}
+
+sub connect_params { return shift()->{connect_params}; }
+sub handle { return shift()->{db_handle}; }
+
+sub DESTROY {
+	my $self = shift;
+	$self->handle->disconnect;
+	my $dn = $self->connect_params->{dbname};
+	my $dbh = $self->connect('template1');
+	$dbh->do("drop database $dn");
+	$dbh->disconnect;
+}
+
 =head1 BUGS
 
-Works with PostgreSQL database currently.
+* Works with PostgreSQL database currently.
 
 =head1 AUTHOR
 
@@ -54,32 +100,5 @@ LICENSE file included with this module.
 Test::More
 
 =cut
-
-=head2 create
-
-Creates temporary database. It will be dropped when the resulting
-instance will go out of scope.
-
-=cut
-
-sub create {
-	my ($class, $db_name) = @_;
-	my $self = bless { db_name => $db_name }, $class;
-	`createdb $db_name >& /dev/null`;
-	my $dbh = DBI->connect("dbi:Pg:dbname=$db_name", "", "",
-			{ RaiseError => 1, AutoCommit => 1 });
-	$self->{db_handle} = $dbh;
-	return $self;
-}
-
-sub name { return shift()->{db_name}; }
-sub handle { return shift()->{db_handle}; }
-
-sub DESTROY {
-	my $self = shift;
-	my $db_name = $self->name;
-	$self->handle->disconnect;
-	`dropdb $db_name >& /dev/null`;
-}
 
 1; 

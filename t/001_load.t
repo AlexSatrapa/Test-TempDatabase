@@ -12,7 +12,7 @@ unless ($<) {
 	setuid($p_uid) or die "Unable to set $p_uid uid";
 }
 
-my $test_db = Test::TempDatabase->create('test_temp_db_test');
+my $test_db = Test::TempDatabase->create(dbname => 'test_temp_db_test');
 like(join('', `psql -l`), qr/test_temp_db_test/);
 
 my $dbh = $test_db->handle;
