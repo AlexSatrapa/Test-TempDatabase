@@ -3,7 +3,7 @@ use warnings FATAL => 'all';
 
 package Test::TempDatabase;
 
-our $VERSION = 0.03;
+our $VERSION = 0.04;
 use DBI;
 use DBD::Pg;
 
@@ -57,8 +57,9 @@ sub connect {
 sub create {
 	my ($class, %args) = @_;
 	my $self = bless { connect_params => \%args }, $class;
+	$self->{pid} = $$;
 	my $dbh = $self->connect('template1');
-	$dbh->do("create database " . $args{dbname});
+	$dbh->do("create database \"" . $args{dbname} . "\"");
 	$dbh->disconnect;
 	$dbh = $self->connect($args{dbname});
 	$self->{db_handle} = $dbh;
@@ -71,9 +72,10 @@ sub handle { return shift()->{db_handle}; }
 sub DESTROY {
 	my $self = shift;
 	$self->handle->disconnect;
+	return unless $self->{pid} == $$;
 	my $dn = $self->connect_params->{dbname};
 	my $dbh = $self->connect('template1');
-	$dbh->do("drop database $dn");
+	$dbh->do("drop database \"$dn\"");
 	$dbh->disconnect;
 }
 

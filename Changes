@@ -1,5 +1,9 @@
 Revision history for Perl module Test::TempDatabase
 
+0.04 Jun 20 2005:
+	- drop database iff we are at the same process to guard against forks.
+	- quote the database name to allow them to start with numbers
+
 0.03 Feb 4 2005:
 	- creation, dropping of the database are done through connection handles only
 	- DBD::Pg prerequites are in Makefile.PL
