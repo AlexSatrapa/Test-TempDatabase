@@ -3,7 +3,7 @@ use warnings FATAL => 'all';
 
 package Test::TempDatabase;
 
-our $VERSION = 0.04;
+our $VERSION = 0.05;
 use DBI;
 use DBD::Pg;
 
@@ -59,6 +59,11 @@ sub create {
 	my $self = bless { connect_params => \%args }, $class;
 	$self->{pid} = $$;
 	my $dbh = $self->connect('template1');
+
+	my $arr = $dbh->selectcol_arrayref("select datname from pg_database where "
+			. "datname = '" . $args{dbname} . "'");
+	$dbh->do("drop database \"" . $args{dbname} . "\"") if (@$arr);
+
 	$dbh->do("create database \"" . $args{dbname} . "\"");
 	$dbh->disconnect;
 	$dbh = $self->connect($args{dbname});
