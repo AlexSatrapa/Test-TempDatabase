@@ -3,7 +3,7 @@ use warnings FATAL => 'all';
 
 package Test::TempDatabase;
 
-our $VERSION = 0.06;
+our $VERSION = 0.07;
 use DBI;
 use DBD::Pg;
 use POSIX qw(setuid);
@@ -91,14 +91,25 @@ sub create {
 sub connect_params { return shift()->{connect_params}; }
 sub handle { return shift()->{db_handle}; }
 
-sub DESTROY {
+sub destroy {
 	my $self = shift;
 	$self->handle->disconnect;
+	$self->{db_handle} = undef;
 	return unless $self->{pid} == $$;
 	my $dn = $self->connect_params->{dbname};
 	my $dbh = $self->connect('template1');
-	$dbh->do("drop database \"$dn\"");
+	for (;;) {
+		eval { $dbh->do("drop database \"$dn\""); };
+		last unless $@;
+		print STDERR "# error. retrying in 1 second...\n";
+		sleep 1;
+	}
 	$dbh->disconnect;
+}
+
+sub DESTROY {
+	my $self = shift;
+	$self->destroy if $self->handle;
 }
 
 =head1 BUGS
