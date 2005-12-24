@@ -3,7 +3,7 @@ use warnings FATAL => 'all';
 
 package Test::TempDatabase;
 
-our $VERSION = 0.07;
+our $VERSION = 0.08;
 use DBI;
 use DBD::Pg;
 use POSIX qw(setuid);
@@ -75,7 +75,8 @@ sub create {
 			. "datname = '" . $args{dbname} . "'");
 	$dbh->do("drop database \"" . $args{dbname} . "\"") if (@$arr);
 
-	$dbh->do("create database \"" . $args{dbname} . "\"");
+	$self->try_really_hard(
+			$dbh, "create database \"" . $args{dbname} . "\"");
 	$dbh->disconnect;
 	$dbh = $self->connect($args{dbname});
 	$self->{db_handle} = $dbh;
@@ -91,6 +92,19 @@ sub create {
 sub connect_params { return shift()->{connect_params}; }
 sub handle { return shift()->{db_handle}; }
 
+sub try_really_hard {
+	my ($self, $dbh, $cmd) = @_;
+	$dbh->do("set client_min_messages to fatal");
+	$dbh->{PrintError} = 0;
+	$dbh->{PrintWarn} = 0;
+	for (my $i = 0; $i < 5; $i++) {
+		eval { $dbh->do($cmd); };
+		last unless $@;
+		sleep 1;
+	}
+	print STDERR "# Fatal failure $@\n" if $@;
+}
+
 sub destroy {
 	my $self = shift;
 	$self->handle->disconnect;
@@ -98,12 +112,7 @@ sub destroy {
 	return unless $self->{pid} == $$;
 	my $dn = $self->connect_params->{dbname};
 	my $dbh = $self->connect('template1');
-	for (;;) {
-		eval { $dbh->do("drop database \"$dn\""); };
-		last unless $@;
-		print STDERR "# error. retrying in 1 second...\n";
-		sleep 1;
-	}
+	$self->try_really_hard($dbh, "drop database \"$dn\"");
 	$dbh->disconnect;
 }
 
