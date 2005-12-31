@@ -3,7 +3,7 @@ use warnings FATAL => 'all';
 
 package Test::TempDatabase;
 
-our $VERSION = 0.08;
+our $VERSION = 0.09;
 use DBI;
 use DBD::Pg;
 use POSIX qw(setuid);
@@ -50,9 +50,9 @@ username, password: self-explanatory
 sub connect {
 	my ($self, $db_name) = @_;
 	my $cp = $self->connect_params;
+	my $dbi_args = $cp->{dbi_args} || { RaiseError => 1, AutoCommit => 1 };
 	return DBI->connect("dbi:Pg:dbname=$db_name;" . ($cp->{rest} || ''),
-				$cp->{username}, $cp->{password},
-			{ RaiseError => 1, AutoCommit => 1 });
+				$cp->{username}, $cp->{password}, $dbi_args);
 }
 
 sub become_postgres_user {
