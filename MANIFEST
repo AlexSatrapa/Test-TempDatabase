@@ -6,5 +6,6 @@ Changes
 lib/Test/TempDatabase.pm
 t/001_load.t
 t/100_dropped.t
+t/200_setuid.t
 Makefile.PL
 META.yml     Module meta-data (added by MakeMaker)

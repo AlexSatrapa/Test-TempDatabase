@@ -4,11 +4,12 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
     NAME         => 'Test::TempDatabase',
     VERSION_FROM => 'lib/Test/TempDatabase.pm', # finds $VERSION
-    AUTHOR       => 'Boris Sukholitko (bobatonhu@yahoo.co.uk)',
+    AUTHOR       => 'Boris Sukholitko (boriss@gmail.com)',
     ABSTRACT     => 'Creates and destructs temporary database for testing purposes',
     PREREQ_PM    => {
                      'Test::More' => 0,
 		     'DBD::Pg' => 0,
 		     'DBI' => 0,
+		     'File::Slurp' => '',
                     },
 );

@@ -3,10 +3,11 @@ use warnings FATAL => 'all';
 
 package Test::TempDatabase;
 
-our $VERSION = 0.09;
+our $VERSION = 0.10;
 use DBI;
 use DBD::Pg;
 use POSIX qw(setuid);
+use Carp;
 
 =head1 NAME
 
@@ -32,6 +33,43 @@ Create test database using Test::TempDatabase->create. Use C<handle>
 to get a handle to the database. Database will be automagically dropped
 when Test::TempDatabase instance goes out of scope.
 
+=cut
+sub connect {
+	my ($self, $db_name) = @_;
+	my $cp = $self->connect_params;
+	my $dbi_args = $cp->{dbi_args} || { RaiseError => 1, AutoCommit => 1 };
+	return DBI->connect("dbi:Pg:dbname=$db_name;" . ($cp->{rest} || ''),
+				$cp->{username}, $cp->{password}, $dbi_args);
+}
+
+=head2 $class->become_postgres_user
+
+When running as root, this function becomes different user.
+It decides on the user name by probing TEST_TEMP_DB_USER, SUDO_USER environment
+variables. If these variables are empty, default "postgres" user is used.
+
+=cut
+sub become_postgres_user {
+	my $class = shift;
+	return if $<;
+
+	my $msg;
+	my $user = $ENV{TEST_TEMP_DB_USER};
+	if ($user) {
+		$msg = "\$ENV{TEST_TEMP_DB_USER}";
+	} elsif ($user = $ENV{SUDO_USER}) {
+		$msg = "\$ENV{SUDO_USER}";
+	} else {
+		$user = "postgres";
+		$msg = "default postgres user";
+	}
+
+	carp("# $class\->become_postgres_user: setting "
+			. "$user uid using $msg\n");
+	my $p_uid = getpwnam($user);
+	setuid($p_uid) or die "Unable to set $p_uid uid";
+}
+
 =head2 create
 
 Creates temporary database. It will be dropped when the resulting
@@ -41,27 +79,12 @@ Arguments are passed in as a keyword-value pairs. Available keywords are:
 
 dbname: the name of the temporary database.
 
-rest: the rest of the database connection string.  It can be used to connect to a different host, etc.
+rest: the rest of the database connection string.  It can be used to connect to
+a different host, etc.
 
-username, password: self-explanatory
+username, password: self-explanatory.
 
 =cut
-
-sub connect {
-	my ($self, $db_name) = @_;
-	my $cp = $self->connect_params;
-	my $dbi_args = $cp->{dbi_args} || { RaiseError => 1, AutoCommit => 1 };
-	return DBI->connect("dbi:Pg:dbname=$db_name;" . ($cp->{rest} || ''),
-				$cp->{username}, $cp->{password}, $dbi_args);
-}
-
-sub become_postgres_user {
-	return if $<;
-	print STDERR "# Setting postgres uid\n";
-	my $p_uid = getpwnam('postgres');
-	setuid($p_uid) or die "Unable to set $p_uid uid";
-}
-
 sub create {
 	my ($class, %args) = @_;
 	my $self = bless { connect_params => \%args }, $class;
@@ -95,14 +118,14 @@ sub handle { return shift()->{db_handle}; }
 sub try_really_hard {
 	my ($self, $dbh, $cmd) = @_;
 	$dbh->do("set client_min_messages to fatal");
-	$dbh->{PrintError} = 0;
-	$dbh->{PrintWarn} = 0;
+	local $dbh->{PrintError};
+	local $dbh->{PrintWarn};
 	for (my $i = 0; $i < 5; $i++) {
 		eval { $dbh->do($cmd); };
 		last unless $@;
 		sleep 1;
 	}
-	print STDERR "# Fatal failure $@\n" if $@;
+	print STDERR "# Fatal failure $@ doing $cmd\n" if $@;
 }
 
 sub destroy {
@@ -128,7 +151,7 @@ sub DESTROY {
 =head1 AUTHOR
 
 	Boris Sukholitko
-	bobatonhu@yahoo.co.uk
+	boriss@gmail.com
 
 =head1 COPYRIGHT
 
