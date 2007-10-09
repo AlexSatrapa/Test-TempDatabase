@@ -1,6 +1,11 @@
 use ExtUtils::MakeMaker;
-# See lib/ExtUtils/MakeMaker.pm for details of how to influence
-# the contents of the Makefile that is written.
+
+if ($<) {
+	my $psql = `psql -l 2>&1`;
+	$psql =~ /template1/
+		or die "To install this module you should be postgres admin";
+}
+
 WriteMakefile(
     NAME         => 'Test::TempDatabase',
     VERSION_FROM => 'lib/Test/TempDatabase.pm', # finds $VERSION

@@ -1,8 +1,6 @@
 MANIFEST
 LICENSE
 README
-Todo
-Changes
 lib/Test/TempDatabase.pm
 t/001_load.t
 t/100_dropped.t

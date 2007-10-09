@@ -3,7 +3,7 @@ use warnings FATAL => 'all';
 
 package Test::TempDatabase;
 
-our $VERSION = 0.10;
+our $VERSION = 0.11;
 use DBI;
 use DBD::Pg;
 use POSIX qw(setuid);
@@ -96,10 +96,11 @@ sub create {
 	my $arr = $dbh->selectcol_arrayref(
 			"select datname from pg_database where "
 			. "datname = '" . $args{dbname} . "'");
-	$dbh->do("drop database \"" . $args{dbname} . "\"") if (@$arr);
+	$dbh->do("drop database \"$args{dbname}\"")
+		if (!$args{no_drop} && @$arr);
 
-	$self->try_really_hard(
-			$dbh, "create database \"" . $args{dbname} . "\"");
+	$self->try_really_hard($dbh, "create database \"$args{dbname}\"")
+		unless (@$arr && $args{no_drop});
 	$dbh->disconnect;
 	$dbh = $self->connect($args{dbname});
 	$self->{db_handle} = $dbh;
@@ -133,6 +134,7 @@ sub destroy {
 	$self->handle->disconnect;
 	$self->{db_handle} = undef;
 	return unless $self->{pid} == $$;
+	return if $self->connect_params->{no_drop};
 	my $dn = $self->connect_params->{dbname};
 	my $dbh = $self->connect('template1');
 	$self->try_really_hard($dbh, "drop database \"$dn\"");
