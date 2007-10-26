@@ -3,7 +3,7 @@ use warnings FATAL => 'all';
 
 package Test::TempDatabase;
 
-our $VERSION = 0.11;
+our $VERSION = 0.12;
 use DBI;
 use DBD::Pg;
 use POSIX qw(setuid);
@@ -121,12 +121,13 @@ sub try_really_hard {
 	$dbh->do("set client_min_messages to fatal");
 	local $dbh->{PrintError};
 	local $dbh->{PrintWarn};
+	local $dbh->{RaiseError};
+	my $res;
 	for (my $i = 0; $i < 5; $i++) {
-		eval { $dbh->do($cmd); };
-		last unless $@;
+		$res = $dbh->do($cmd) and last;
 		sleep 1;
 	}
-	print STDERR "# Fatal failure $@ doing $cmd\n" if $@;
+	printf STDERR "# Fatal failure %s doing $cmd\n", $dbh->errstr unless $res;
 }
 
 sub destroy {
