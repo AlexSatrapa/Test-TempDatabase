@@ -3,7 +3,7 @@ use warnings FATAL => 'all';
 
 package Test::TempDatabase;
 
-our $VERSION = 0.12;
+our $VERSION = 0.13;
 use DBI;
 use DBD::Pg;
 use POSIX qw(setuid);
@@ -122,12 +122,14 @@ sub try_really_hard {
 	local $dbh->{PrintError};
 	local $dbh->{PrintWarn};
 	local $dbh->{RaiseError};
+	local $dbh->{HandleError};
 	my $res;
 	for (my $i = 0; $i < 5; $i++) {
 		$res = $dbh->do($cmd) and last;
 		sleep 1;
 	}
-	printf STDERR "# Fatal failure %s doing $cmd\n", $dbh->errstr unless $res;
+	printf STDERR "# Fatal failure %s doing $cmd\n", $dbh->errstr
+		unless $res;
 }
 
 sub destroy {
