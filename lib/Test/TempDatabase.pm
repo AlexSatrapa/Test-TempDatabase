@@ -3,7 +3,7 @@ use warnings FATAL => 'all';
 
 package Test::TempDatabase;
 
-our $VERSION = 0.13;
+our $VERSION = 0.14;
 use DBI;
 use DBD::Pg;
 use POSIX qw(setuid);
@@ -134,6 +134,7 @@ sub try_really_hard {
 
 sub destroy {
 	my $self = shift;
+	return if $self->handle->{InactiveDestroy};
 	$self->handle->disconnect;
 	$self->{db_handle} = undef;
 	return unless $self->{pid} == $$;
