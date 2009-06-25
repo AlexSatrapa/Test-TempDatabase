@@ -3,11 +3,12 @@ use warnings FATAL => 'all';
 
 package Test::TempDatabase;
 
-our $VERSION = 0.14;
+our $VERSION = 0.15;
 use DBI;
 use DBD::Pg;
 use POSIX qw(setuid);
 use Carp;
+use File::Slurp;
 
 =head1 NAME
 
@@ -42,6 +43,13 @@ sub connect {
 				$cp->{username}, $cp->{password}, $dbi_args);
 }
 
+sub find_postgres_user {
+	return $< if $<;
+
+	my $uname = $ENV{TEST_TEMP_DB_USER} || $ENV{SUDO_USER} || "postgres";
+	return getpwnam($uname);
+}
+
 =head2 $class->become_postgres_user
 
 When running as root, this function becomes different user.
@@ -53,21 +61,12 @@ sub become_postgres_user {
 	my $class = shift;
 	return if $<;
 
-	my $msg;
-	my $user = $ENV{TEST_TEMP_DB_USER};
-	if ($user) {
-		$msg = "\$ENV{TEST_TEMP_DB_USER}";
-	} elsif ($user = $ENV{SUDO_USER}) {
-		$msg = "\$ENV{SUDO_USER}";
-	} else {
-		$user = "postgres";
-		$msg = "default postgres user";
-	}
+	my $p_uid = $class->find_postgres_user;
+	my @pw = getpwuid($p_uid);
 
-	carp("# $class\->become_postgres_user: setting "
-			. "$user uid using $msg\n");
-	my $p_uid = getpwnam($user);
+	carp("# $class\->become_postgres_user: setting $pw[0] uid\n");
 	setuid($p_uid) or die "Unable to set $p_uid uid";
+	$ENV{HOME} = $pw[ $#pw - 1 ];
 }
 
 =head2 create
@@ -87,8 +86,7 @@ username, password: self-explanatory.
 =cut
 sub create {
 	my ($class, %args) = @_;
-	my $self = bless { connect_params => \%args }, $class;
-	$self->{pid} = $$;
+	my $self = $class->new(\%args);
 	$self->become_postgres_user;
 
 	my $dbh = $self->connect('template1');
@@ -111,6 +109,48 @@ sub create {
 		$self->{schema} = $vs;
 	}
 	return $self;
+}
+
+sub new {
+	my ($class, $args) = @_;
+	my $self = bless { connect_params => $args }, $class;
+	$self->{pid} = $$;
+	return $self;
+}
+
+sub create_cluster {
+	my $self = shift;
+	my $pg_conf = `pg_config | grep BINDIR`;
+	my ($bdir) = ($pg_conf =~ /= (\S+)$/);
+	die "No binary dir found: $pg_conf\n" unless $bdir;
+	my $cdir = $self->{connect_params}->{cluster_dir};
+	my $res = `$bdir/initdb -D $cdir 2>&1`;
+	die $res if $?;
+
+	append_file("$cdir/postgresql.conf"
+		, "\nlisten_addresses = ''\nunix_socket_directory = '$cdir'\n");
+}
+
+sub start_server {
+	my $self = shift;
+	my ($bdir) = (`pg_config | grep BINDIR` =~ /= (\S+)$/);
+	my $cdir = $self->{connect_params}->{cluster_dir};
+	system("$bdir/pg_ctl -D $cdir -l $cdir/log start") and die;
+
+	sleep 1;
+	for (1 .. 5) {
+		my $log = read_file("$cdir/log");
+		return if $log =~ /ready to accept/;
+		sleep 1;
+	}
+	die "Server did not start " . read_file("$cdir/log");
+}
+
+sub stop_server {
+	my $self = shift;
+	my ($bdir) = (`pg_config | grep BINDIR` =~ /= (\S+)$/);
+	my $cdir = $self->{connect_params}->{cluster_dir};
+	system("$bdir/pg_ctl -D $cdir -l $cdir/log stop") and die;
 }
 
 sub connect_params { return shift()->{connect_params}; }

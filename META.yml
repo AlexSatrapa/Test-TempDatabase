@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:                Test-TempDatabase
-version:             0.14
+version:             0.15
 abstract:            Creates and destructs temporary database for testing purposes
 license:             ~
 author:              
